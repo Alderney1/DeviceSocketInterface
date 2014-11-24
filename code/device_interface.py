@@ -24,7 +24,7 @@ __version_next_update__ = ""
 #Hardware
 #--------------------------------------------------------------------
 """
-The hardware for this uart project is device that have a ip-adresse, which means it can be connected over socket.
+The hardware for this uart project is device that have a ip-address, which means it can be connected over socket.
 """
 #--------------------------------------------------------------------
 #IMPORT
@@ -42,16 +42,16 @@ ALWAYS_LOG_LEVEL = 1 # print always
 #--------------------------------------------------------------------
 #METHODS
 #--------------------------------------------------------------------
-def log(self,msg, log_level=LOG_LEVEL):
+def log(msg, log_level=LOG_LEVEL):
     """Print a message, and track, where the log is invoked
     Input:
     -msg: message to be printed, ''
-    -log_level: informationlevel, i"""
+    -log_level: information level, i"""
     global LOG_LEVEL
     if log_level <= LOG_LEVEL:
-        print(str(log_level) + ' : ' + FILEREC + ' ::' +
+        print(str(log_level) + ' : ' + __file__ + '.py ::' +
               traceback.extract_stack()[-2][2] + ' : ' + msg)
-
+        
 class DeviceSocketInterface(threading.Thread):
     """Class to receive data from the ati box"""
     class Error(Exception):
@@ -72,7 +72,7 @@ class DeviceSocketInterface(threading.Thread):
         #Assignment
         self.__host = host # host to connect to realtime
         self.__port = port # port to the sensor
-        self.__timeout = args.get('socket_timeout',1.0) # socket timeout
+        self.__timeout = args.get('timeout',1.0) # socket timeout
         self.__name = args.get('name','Invalid')
         self.__timestamps = args.get('timestamps',False)
         self.__log_level = args.get('log_level',2)
@@ -81,7 +81,7 @@ class DeviceSocketInterface(threading.Thread):
         self.daemon = True
         #socket to the sensor connection
         self.__sockATI = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.__sockATI.settimeout(self._socket_timeout)
+        self.__sockATI.settimeout(self.__timeout)
         #Event
         self.__rec_event = threading.Event() # event for received data
         self.__thread_init = threading.Event() # status for the thread
@@ -95,12 +95,12 @@ class DeviceSocketInterface(threading.Thread):
         self.start()
         log(__class__ + ' : ' + self.__name + ' is created.', ALWAYS_LOG_LEVEL)
 
-
+    """
     def __del__(self):
-        """Close the socket connection."""
+        Close the socket connection.
         self.__sockATI.close()
-        log(__class__ + ' : ' + self.__name + ' is destroyed', ALWAYS_LOG_LEVEL)
-
+        log(str(__class__) + ' : ' + self.__name + ' is destroyed', ALWAYS_LOG_LEVEL)
+    """
     def send_data(self, data):
         """
         Sending custom made data to the device.
@@ -109,7 +109,7 @@ class DeviceSocketInterface(threading.Thread):
 
 
     def get_data(self, sync=True, timeout=0.5):
-        """Property will return recevied from the sensor.
+        """Property will return received from the sensor.
         Input:
         - sync. If true it will wait until the event will be set, it
         means that new sensor data is received. If false, it is
@@ -117,14 +117,14 @@ class DeviceSocketInterface(threading.Thread):
         - timeout, indicate how long it should wait for event.
         0 = forever.
         Output:
-        - revieced, sensor data, None for timeout."""
-        if self._rec_event.isSet(): # if event is  set from the run
-            self._rec_event.clear() # clear the flag
-            return self._received   # return sensor data
+        - received, sensor data, None for timeout."""
+        if self.__rec_event.isSet(): # if event is  set from the run
+            self.__rec_event.clear() # clear the flag
+            return self.__received   # return sensor data
         elif sync == True: # if sync is enabled
-            if self._rec_event.wait(timeout): # wait for event or timeout
-                self._rec_event.clear() # clear flag
-                return self._received
+            if self.__rec_event.wait(timeout): # wait for event or timeout
+                self.__rec_event.clear() # clear flag
+                return self.__received
             else:
                 return None # None for timeout happen
         else: # async
@@ -133,27 +133,33 @@ class DeviceSocketInterface(threading.Thread):
 
     def run(self):
         """Thread will get the new input from the sensor, and set the
-        event to true. Continueouly update received
+        event to true. Continuously update received
         """
-        self.log(__class__ + ' : ' + self._name + ' is RUNNING', ALWAYS_LOG_LEVEL)
-        self._thread_init.set() # set the thread to be alive
-
-        while self._thread_init.isSet() == True:
+        
+        self.__thread_init.set() # set the thread to be alive
+        log(__class__ + ' : ' + self.__name + ' is RUNNING', ALWAYS_LOG_LEVEL)
+        if self.__thread_init:
+            print('Sand')
+        while self.__thread_init.isSet() == True:
             """Will only run if thread is set to alive, if it's false
             the run method will end, and this means the thread will
             be terminated."""
+            #print('DSI ---------------------------')
             try:
-                self.__received = self.__sockATI.recv(2048) # get reciced
+                self.__received = self.__sockATI.recv(1024) # get received
+                #print('DSI --------------------------- end')
                 self.__rec_event.set() # flag for recived data
                 
                 if self.__timestamps: # If write timestamps to file is true
                     self.__freq_info()
                               
-                log('recived data',self._log_level)
+                #log('recived data',self.__log_level)
+                #print(self.__received)
             except socket.timeout: # socket timeout based on the arg
+                log('Timeout data',self.__log_level)
                 pass
 
-        log('ATI_Reciver ' + self._name + ' is stopped', ALWAYS_LOG_LEVEL)
+        log('ATI_Reciver ' + self.__name + ' is stopped', ALWAYS_LOG_LEVEL)
         if self._timelist:
             self._timelist.close() # close the timestamps file
             log('Close timestamps receiver', self._log_level)
@@ -182,9 +188,13 @@ class DeviceSocketInterface(threading.Thread):
         if a timeout is given.
         Inputs:
         timeout:float-> timeout given in secs."""
-        if self.__thread_init.wait(timeout):
+        log('Waiting to startup ' + self.__name)
+        self.__thread_init.wait(timeout)
+        if self.__thread_init.isSet():
+            log(self.__name + ' is started up')
             return True
         else:
+            self.Error(self.__name + ' was not able to started up')
             return False
 
     def wait_terminated(self,timeout=None):
@@ -197,5 +207,6 @@ class DeviceSocketInterface(threading.Thread):
             return True
         else:
             return False
-
+    def get_name(self):
+        return self.__name
 
