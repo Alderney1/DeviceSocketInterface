@@ -76,13 +76,13 @@ class ServerSocketInterface(threading.Thread):
             threading.Thread.__init__(self) # initialize the thread
             self.daemon = True
             self.start()
-        log(self.__class__ + ' : ' + self.__sc + ' : ' + self.__name + ' is created.', ALWAYS_LOG_LEVEL)
+            log(__class__ + ' : '  + ' is created.', ALWAYS_LOG_LEVEL)
 
         def run(self):
              self.__thread_init.set() # set the thread to be alive
              log(__class__ + ' : ' + self.__name + ' is RUNNING', ALWAYS_LOG_LEVEL)
 
-    def __init__(self,host=None,port=None,**args):
+    def __init__(self,host=None,port=None,**kwargs):
         """
         The constructor if the interface class.
         Input:
@@ -92,18 +92,18 @@ class ServerSocketInterface(threading.Thread):
         #Assignment
         self.__host = host # host to connect to realtime
         self.__port = port # port to the sensor
-        self.__timeout = args.get('timeout',10.0) # socket timeout
-        self.__name = args.get('name','Invalid')
+        self.__timeout = kwargs.get('timeout',10000.0) # socket timeout
+        self.__name = kwargs.get('name','Invalid')
         self.__max_clients = kwargs.get('max_clients',1)
-        self.__timestamps = args.get('timestamps',False)
-        self.__log_level = args.get('log_level',2)
+        self.__timestamps = kwargs.get('timestamps',False)
+        self.__log_level = kwargs.get('log_level',2)
         #local assignment
         self.__clients = []
         #Threading
         threading.Thread.__init__(self) # initialize the thread
         self.daemon = True
         #socket to the sensor connection
-        self.__sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__sock.settimeout(self.__timeout)
         self.__sock.bind((self.__host,self.__port))
         self.__sock.listen(self.__max_clients)
@@ -119,7 +119,7 @@ class ServerSocketInterface(threading.Thread):
         self.__thread_init.clear()
         self.__thread_terminated.clear()
         self.start()
-        log(__class__ + ' : ' + self.__sc + ' : ' + self.__name + ' is created.', ALWAYS_LOG_LEVEL)
+        log(__class__ + ' : '  + ' : ' + self.__name + ' is created.', ALWAYS_LOG_LEVEL)
 
     def run(self):
         """Thread will get the new input from the sensor, and set the
@@ -135,6 +135,7 @@ class ServerSocketInterface(threading.Thread):
             the run method will end, and this means the thread will
             be terminated."""
             con, addr = self.__sock.accept()
+            print('accepted')
             self.__client.append(self.ClientHandler(conn=conn,addr=addr,name='Client'))
 
             try:
