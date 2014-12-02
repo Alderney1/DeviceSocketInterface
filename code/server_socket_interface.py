@@ -104,6 +104,7 @@ class ServerSocketInterface(threading.Thread):
         self.daemon = True
         #socket to the sensor connection
         self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.__sock.settimeout(self.__timeout)
         self.__sock.bind((self.__host,self.__port))
         self.__sock.listen(self.__max_clients)
@@ -118,45 +119,63 @@ class ServerSocketInterface(threading.Thread):
         self.__rec_event.clear()
         self.__thread_init.clear()
         self.__thread_terminated.clear()
+        self.__conn = None
         self.start()
         log(__class__ + ' : '  + ' : ' + self.__name + ' is created.', ALWAYS_LOG_LEVEL)
 
+    def sendMsg(self,data):
+        if self.__conn == None:
+            self.Error('Connection have not been created !!!')
+        self.__conn.send(data)
+        log('Sending data to client(%s, %d)' % (self.__addr[0],self.__addr[1]))
+        
+    def recvMsg(self,sync=False,timeout=None):
+            if sync == True:
+                self.__rec_event.wait(timeout)
+                if self.__rec_event.is_set():
+                    self.__rec_event.clear()
+                    return self.__received
+                else:
+                    return None
+            else:
+                return self.__received
     def run(self):
         """Thread will get the new input from the sensor, and set the
         event to true. Continuously update received
         """
-        connection = None
+      
+        log('Server(%s) is waiting for connection to a client on adress %s and port %d' % (self.__name,self.__host,self.__port), self.__log_level)
+        self.__conn, self.__addr = self.__sock.accept()
+        log('Server(%s) have got connection to client in adress %s and port %d' % (self.__name,self.__addr[0],self.__addr[1]), self.__log_level)
         self.__thread_init.set() # set the thread to be alive
-        log(__class__ + ' : ' + self.__name + ' is RUNNING', ALWAYS_LOG_LEVEL)
-        if self.__thread_init:
-            print('Sand')
         while self.__thread_init.isSet() == True:
             """Will only run if thread is set to alive, if it's false
             the run method will end, and this means the thread will
             be terminated."""
-            con, addr = self.__sock.accept()
-            print('accepted')
-            self.__client.append(self.ClientHandler(conn=conn,addr=addr,name='Client'))
-
+            
             try:
                 self.__received = self.__sock.recv(1024) # get received
                 self.__rec_event.set() # flag for recived data
-                if self.__timestamps: # If write timestamps to file is true
-                    self.__freq_info()    
+                #if self.__timestamps: # If write timestamps to file is true
+                #    self.__freq_info()    
             except socket.timeout: # socket timeout based on the arg
-                log('Timeout data',self.__log_level)
+                log('Timeout data after %d seconds of no response of the client' % self.__timeout,self.__log_level)
                 pass
            
-
-                if connection == None:
-                    connection, client_address = self.__sock.accept()
-                    data = connection.recv(16)
-   
-        log('ATI_Reciver ' + self.__name + ' is stopped', ALWAYS_LOG_LEVEL)
-        if self._timelist:
-            self._timelist.close() # close the timestamps file
-            log('Close timestamps receiver', self._log_level)
-
         self._thread_terminated.set()
         self.log(__class__ + ' : ' + self._name + ' is ENDING', ALWAYS_LOG_LEVEL)
 
+    def wait_startup(self,timeout=None):
+        """Wait to this thread is started up, expect
+        if a timeout is given.
+        Inputs:
+        timeout:float-> timeout given in secs."""
+         
+        log('Waiting to startup ' + self.__name,self.__log_level)
+        self.__thread_init.wait(timeout)
+        if self.__thread_init.isSet():
+            log(self.__name + ' is started up')
+            return True
+        else:
+            self.Error(self.__name + ' was not able to started up')
+            return False
